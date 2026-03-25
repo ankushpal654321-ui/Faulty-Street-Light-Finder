@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Street Light Dashboard</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase.js"></script>
+
+  <style>
+    #map { height: 100vh; width: 100%; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <script>
+    // 🔥 Firebase Config (replace with your project)
+    var firebaseConfig = {
+      apiKey: "AIzaSyDCHgKJeB--KlUKseqeAZctPb_pnkImPqg",
+      databaseURL: "https://faulty-street-light-finder-default-rtdb.firebaseio.com/"
+    };
+    firebase.initializeApp(firebaseConfig);
+    var db = firebase.database();
+
+    // 🌍 Initialize map
+    var map = L.map('map').setView([19.07, 72.87], 13);
+
+    // Free map tiles from OpenStreetMap
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Store markers
+    var markers = {};
+
+    // Function to get marker color
+    function getColor(status) {
+      if(status === "WORKING") return "green";
+      if(status === "FAULT") return "red";
+      return "gray"; // OFF
+    }
+
+    // Real-time update from Firebase
+    db.ref().on("value", function(snapshot) {
+      var data = snapshot.val();
+      for (let key in data) {
+        let pole = data[key];
+        let lat = pole.lat;
+        let lon = pole.lon;
+        let status = pole.status;
+        let color = getColor(status);
+
+        // If marker exists → update
+        if(markers[key]) {
+          markers[key].setLatLng([lat, lon]);
+          markers[key].setStyle({color: color});
+        } 
+        else {
+          // Create new circle marker
+          markers[key] = L.circleMarker([lat, lon], {
+            radius: 10,
+            color: color,
+            fillColor: color,
+            fillOpacity: 1
+          }).addTo(map).bindPopup(key + ": " + status);
+        }
+      }
+    });
+  </script>
+</body>
+</html>
