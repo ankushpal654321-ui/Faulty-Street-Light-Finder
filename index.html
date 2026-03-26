@@ -1,90 +1,113 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Street Light Dashboard</title>
+  <title>Smart Street Light System</title>
+
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+
   <style>
-    body {
-      text-align: center;
-      font-family: Arial;
-      background: #111;
-      color: white;
+    body { margin:0; font-family:Arial; }
+    #map { height:70vh; }
+
+    #info {
+      text-align:center;
+      padding:10px;
+      background:#111;
+      color:white;
     }
 
-    .container {
-      display: flex;
-      justify-content: center;
-      gap: 50px;
-      margin-top: 100px;
+    .fault {
+      animation: blink 1s infinite;
     }
 
-    .pole {
-      text-align: center;
+    @keyframes blink {
+      50% { opacity: 0.3; }
     }
-
-    .dot {
-      height: 80px;
-      width: 80px;
-      border-radius: 50%;
-      display: inline-block;
-      margin-bottom: 10px;
-    }
-
-    .green { background: green; }
-    .red { background: red; }
-    .gray { background: gray; }
   </style>
 </head>
 
 <body>
 
-<h1>Street Light Monitoring System</h1>
+<div id="map"></div>
+<div id="info">Last Updated: --</div>
 
-<div class="container">
+<!-- Graph -->
+<iframe width="100%" height="250"
+src="https://thingspeak.com/channels/3311507/charts/1">
+</iframe>
 
-  <div class="pole">
-    <div id="p1" class="dot gray"></div>
-    <p>Pole 1</p>
-  </div>
-
-  <div class="pole">
-    <div id="p2" class="dot gray"></div>
-    <p>Pole 2</p>
-  </div>
-
-  <div class="pole">
-    <div id="p3" class="dot gray"></div>
-    <p>Pole 3</p>
-  </div>
-
-</div>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
 
-const channelID = " 3311507";
+const channelID = "3311507";
 
-function updateData(){
+const poles = [
+  {name:"Pole 1", lat:19.0760, lng:72.8777},
+  {name:"Pole 2", lat:19.0765, lng:72.8780},
+  {name:"Pole 3", lat:19.0770, lng:72.8785}
+];
+
+var map = L.map('map').setView([19.0760,72.8777],17);
+
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+let markers = [];
+
+function getIcon(color){
+  return L.icon({
+    iconUrl: `https://maps.google.com/mapfiles/ms/icons/${color}-dot.png`,
+    iconSize: [32,32]
+  });
+}
+
+function getStatusText(status){
+  if(status == 1) return "Working";
+  if(status == 0) return "Fault";
+  return "Idle";
+}
+
+function updateMap(){
+
   fetch(`https://api.thingspeak.com/channels/${channelID}/feeds/last.json`)
   .then(res => res.json())
   .then(data => {
 
-    setColor("p1", data.field1);
-    setColor("p2", data.field2);
-    setColor("p3", data.field3);
+    document.getElementById("info").innerText =
+      "Last Updated: " + new Date().toLocaleTimeString();
+
+    markers.forEach(m => map.removeLayer(m));
+    markers = [];
+
+    poles.forEach((pole, i) => {
+
+      let status = data["field" + (i+1)];
+      let color = "grey";
+
+      if(status == 1) color = "green";
+      else if(status == 0) color = "red";
+
+      let marker = L.marker([pole.lat, pole.lng], {
+        icon: getIcon(color)
+      }).addTo(map);
+
+      if(status == 0){
+        marker._icon.classList.add("fault");
+      }
+
+      marker.bindPopup(`
+        <b>${pole.name}</b><br>
+        Status: ${getStatusText(status)}
+      `);
+
+      markers.push(marker);
+    });
 
   });
 }
 
-function setColor(id, status){
-  let el = document.getElementById(id);
-  el.className = "dot";
-
-  if(status === "GREEN") el.classList.add("green");
-  else if(status === "RED") el.classList.add("red");
-  else el.classList.add("gray");
-}
-
-// Auto refresh every 5 sec
-setInterval(updateData, 5000);
+setInterval(updateMap, 5000);
+updateMap();
 
 </script>
 
