@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Street Light Dashboard</title>
+  <title>Street Light Dashboard (3 Poles)</title>
 
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
@@ -13,6 +13,7 @@
     #map { height: 100vh; width: 100%; }
   </style>
 </head>
+
 <body>
   <div id="map"></div>
 
@@ -20,58 +21,72 @@
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
   <script>
-    // 🔥 Firebase Config (replace with your project)
+    // 🔥 Firebase Config
     var firebaseConfig = {
       apiKey: "AIzaSyDCHgKJeB--KlUKseqeAZctPb_pnkImPqg",
       databaseURL: "https://faulty-street-light-finder-default-rtdb.firebaseio.com/"
     };
+
     firebase.initializeApp(firebaseConfig);
     var db = firebase.database();
 
-    // 🌍 Initialize map
+    // 🌍 Map initialize
     var map = L.map('map').setView([19.07, 72.87], 13);
 
-    // Free map tiles from OpenStreetMap
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
+      attribution: '&copy; OpenStreetMap'
     }).addTo(map);
 
-    // Store markers
-    var markers = {};
+    // Store markers for 3 poles
+    var markers = {
+      pole1: null,
+      pole2: null,
+      pole3: null
+    };
 
-    // Function to get marker color
+    // 🎨 Status color
     function getColor(status) {
       if(status === "WORKING") return "green";
       if(status === "FAULT") return "red";
-      return "gray"; // OFF
+      return "gray";
     }
 
-    // Real-time update from Firebase
+    // 🔄 Live update
     db.ref().on("value", function(snapshot) {
       var data = snapshot.val();
-      for (let key in data) {
-        let pole = data[key];
-        let lat = pole.lat;
-        let lon = pole.lon;
-        let status = pole.status;
-        let color = getColor(status);
 
-        // If marker exists → update
-        if(markers[key]) {
-          markers[key].setLatLng([lat, lon]);
-          markers[key].setStyle({color: color});
-        } 
-        else {
-          // Create new circle marker
-          markers[key] = L.circleMarker([lat, lon], {
-            radius: 10,
-            color: color,
-            fillColor: color,
-            fillOpacity: 1
-          }).addTo(map).bindPopup(key + ": " + status);
-        }
-      }
+      updatePole("pole1", data);
+      updatePole("pole2", data);
+      updatePole("pole3", data);
     });
+
+    // 🔧 Function for each pole
+    function updatePole(poleName, data) {
+      if(!data[poleName]) return;
+
+      let pole = data[poleName];
+      let lat = pole.lat;
+      let lon = pole.lon;
+      let status = pole.status;
+      let color = getColor(status);
+
+      if(markers[poleName]) {
+        markers[poleName].setLatLng([lat, lon]);
+        markers[poleName].setStyle({
+          color: color,
+          fillColor: color
+        });
+      } 
+      else {
+        markers[poleName] = L.circleMarker([lat, lon], {
+          radius: 10,
+          color: color,
+          fillColor: color,
+          fillOpacity: 1
+        }).addTo(map)
+          .bindPopup(poleName.toUpperCase() + ": " + status);
+      }
+    }
   </script>
 </body>
 </html>
