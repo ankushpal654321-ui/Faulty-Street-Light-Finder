@@ -30,7 +30,7 @@
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
     // --- Map Initialization ---
-    var map = L.map('map').setView([19.0760, 72.8777], 16); // Mumbai approx
+    var map = L.map('map').setView([19.0760, 72.8777], 16);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: 'Map data © OpenStreetMap contributors'
@@ -43,11 +43,11 @@
       {name:"Pole 3", lat:19.0770, lng:72.8785, status:0}
     ];
 
-    // --- Color logic ---
+    // --- Color logic (updated for Red=3) ---
     function getPoleColor(status){
-      if(status===0) return "gray";
-      if(status===1) return "green";
-      if(status===2) return "red";
+      if(status===0) return "gray";    // Gray
+      if(status===1) return "green";   // Green
+      if(status===3) return "red";     // Red
       return "gray";
     }
 
@@ -73,25 +73,24 @@
     async function updatePoleStatus(){
       try{
         // Replace this URL with your ThingSpeak channel feed JSON
-        var url = "https://api.thingspeak.com/channels/ 3311507/feeds.json?results=1";
+        var url = "https://api.thingspeak.com/channels/3311507/feeds.json?results=1";
         let response = await fetch(url);
         let data = await response.json();
 
-        // ThingSpeak fields 1,2,3 correspond to pole statuses
         let feeds = data.feeds[0];
         let statusArr = [parseInt(feeds.field1), parseInt(feeds.field2), parseInt(feeds.field3)];
 
         statusArr.forEach((s, idx)=>{
           poles[idx].status = s;
           markers[idx].setIcon(createPoleIcon(getPoleColor(s)));
-          markers[idx].setPopupContent(`<b>${poles[idx].name}</b><br>Status: ${s===0?'Gray (OFF)':s===1?'Green (Working)':'Red (Fault)'}</b>`);
+          markers[idx].setPopupContent(`<b>${poles[idx].name}</b><br>Status: ${s===0?'Gray (OFF)':s===1?'Green (Working)':s===3?'Red (Fault)':'Unknown'}</b>`);
         });
       } catch(err){
         console.error("Error fetching ThingSpeak data", err);
       }
     }
 
-    // --- Auto refresh every 20 seconds (matches ESP32 loop) ---
+    // --- Auto refresh every 20 seconds ---
     updatePoleStatus();
     setInterval(updatePoleStatus, 20000);
 
