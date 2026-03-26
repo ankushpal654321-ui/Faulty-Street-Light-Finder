@@ -1,78 +1,74 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <title>Smart Street Light Map</title>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-  <style>
-    #map { height: 100vh; }
-  </style>
-</head>
-
-<body>
-
-<div id="map"></div>
-
 <script>
 
 // MAP INIT
-var map = L.map('map').setView([19.467960,72.888108 ], 15);
+var map = L.map('map').setView([19.467960,72.888108], 15);
 
 // TILE
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
+// ICON (your street light image)
+var poleIcon = L.icon({
+  iconUrl: 'streetlight.png',  // 👈 upload this image in repo
+  iconSize: [40, 40],
+  iconAnchor: [20, 40]
+});
+
 // POLE LOCATIONS
 var poles = [
-  {lat:19.467960, lng:72.888108},
-  {lat:19.467040, lng:72.872570},
-  {lat:19.469308, lng:72.862342}
+  {lat:19.467960, lng:72.888108, name:"Pole 1"},
+  {lat:19.467040, lng:72.872570, name:"Pole 2"},
+  {lat:19.469308, lng:72.862342, name:"Pole 3"}
 ];
 
 var markers = [];
 
-// CREATE MARKERS
+// CREATE MARKERS WITH NAME BELOW
 for(let i=0;i<poles.length;i++){
-  let marker = L.circleMarker([poles[i].lat, poles[i].lng], {
-    radius: 10,
-    color: "gray"
+
+  let marker = L.marker([poles[i].lat, poles[i].lng], {
+    icon: poleIcon
   }).addTo(map);
+
+  // Label below icon
+  marker.bindTooltip(poles[i].name, {
+    permanent: true,
+    direction: "bottom",
+    offset: [0, 10]
+  }).openTooltip();
 
   markers.push(marker);
 }
 
-// FETCH THINGSPEAK
+// FETCH THINGSPEAK DATA
 function updateData(){
 
-  fetch("https://api.thingspeak.com/channels/3311507/feeds/last.json")
+  fetch("https://api.thingspeak.com/channels/ 3311507/feeds/last.json")
   .then(res => res.json())
   .then(data => {
 
     let status = [
-      parseInt(data.field1),
-      parseInt(data.field2),
-      parseInt(data.field3)
+      Number(data.field1),
+      Number(data.field2),
+      Number(data.field3)
     ];
 
     for(let i=0;i<3;i++){
 
-      if(status[i] == -1){
-        markers[i].setStyle({color:"gray"}); // OFF
+      // CHANGE ICON COLOR USING CSS FILTER
+      if(status[i] === -1){
+        markers[i]._icon.style.filter = "grayscale(100%)"; // gray
 
-      } else if(status[i] == 1){
-        markers[i].setStyle({color:"green"}); // WORKING
+      } else if(status[i] === 1){
+        markers[i]._icon.style.filter = "hue-rotate(90deg)"; // green
 
-      } else if(status[i] == 0){
-        markers[i].setStyle({color:"red"}); // FAULT
+      } else if(status[i] === 0){
+        markers[i]._icon.style.filter = "hue-rotate(0deg) saturate(5)"; // red
       }
     }
   });
 }
 
-// UPDATE EVERY 10 SEC
-setInterval(updateData, 10000);
+// AUTO UPDATE
+setInterval(updateData, 5000);
 
 </script>
-
-</body>
-</html>
