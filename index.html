@@ -1,145 +1,100 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Smart Poles Map</title>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Street Light Map</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <style>
-    body { margin:0; font-family:Arial; }
-    #map { height:100vh; }
+    body { margin:0; font-family: Arial; }
+    #map { height: 90vh; }
+
+    /* Info Box */
     #info {
-      position:absolute;
-      top:10px;
-      left:50%;
-      transform:translateX(-50%);
-      background:white;
-      padding:10px 20px;
-      border-radius:5px;
-      box-shadow:0 0 10px rgba(0,0,0,0.3);
-      z-index:1000;
+      text-align:center;
+      padding:10px;
+      background:#111;
+      color:white;
     }
-    canvas { width:250px !important; height:150px !important; }
+
+    /* Pole shapes (SVG markers) */
+    .pole-icon {
+      width: 30px;
+      height: 50px;
+      display: block;
+    }
   </style>
 </head>
 <body>
-<div id="info">Smart Pole Status Map</div>
-<div id="map"></div>
+  <div id="info">Smart Street Light Map - Gray=OFF, Green=Working, Red=Fault</div>
+  <div id="map"></div>
 
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <script>
+    // --- Map Initialization ---
+    var map = L.map('map').setView([19.0760, 72.8777], 16); // Mumbai approx
 
-<script>
-  // --- Initialize map ---
-  var map = L.map('map').setView([19.07, 72.87], 13);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19, attribution: '© OpenStreetMap'
-  }).addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: 'Map data © OpenStreetMap contributors'
+    }).addTo(map);
 
-  // --- Pole icon ---
-  function createPoleIcon(color) {
-      return L.divIcon({
-          html: `<div style="
-              width:20px; height:40px; background:${color};
-              border-radius:4px; position:relative;">
-              <div style="
-                width:0; height:0;
-                border-left:10px solid transparent;
-                border-right:10px solid transparent;
-                border-bottom:10px solid ${color};
-                position:absolute; top:-10px; left:0;"></div>
-          </div>`,
-          className:'', iconSize:[20,50], iconAnchor:[10,50], popupAnchor:[0,-50]
-      });
-  }
+    // --- Pole Data ---
+    var poles = [
+      {name:"Pole 1", lat:19.0760, lng:72.8777, status:0},
+      {name:"Pole 2", lat:19.0765, lng:72.8780, status:0},
+      {name:"Pole 3", lat:19.0770, lng:72.8785, status:0}
+    ];
 
-  // --- Poles initialization ---
-  var poles = [
-      { name:'Pole 1', lat:19.072, lon:72.882, status:'gray', field:'field1' },
-      { name:'Pole 2', lat:19.068, lon:72.885, status:'gray', field:'field2' },
-      { name:'Pole 3', lat:19.070, lon:72.890, status:'gray', field:'field3' }
-  ];
-  var poleMarkers = [];
-  const apiKey = "50TS40IY7R5RVBKP"; // ThingSpeak API key
+    // --- Color logic ---
+    function getPoleColor(status){
+      if(status===0) return "gray";
+      if(status===1) return "green";
+      if(status===2) return "red";
+      return "gray";
+    }
 
-  // --- Add poles to map ---
-  poles.forEach((pole, index)=>{
-      var marker = L.marker([pole.lat, pole.lon], {icon:createPoleIcon('gray')})
-          .bindPopup(`<b>${pole.name}</b><br>Status: gray<br>Click for history`)
-          .addTo(map);
-      marker.on('popupopen', ()=>{ fetchHistoricalData(pole.field, marker); });
-      poleMarkers.push(marker);
-  });
+    // --- Create custom SVG pole marker ---
+    function createPoleIcon(color){
+      var svg = `<svg class="pole-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 50">
+        <rect x="8" y="5" width="4" height="40" fill="${color}" stroke="black" stroke-width="1"/>
+        <circle cx="10" cy="5" r="5" fill="${color}" stroke="black" stroke-width="1"/>
+      </svg>`;
+      return L.divIcon({className:'', html: svg, iconSize:[30,50], iconAnchor:[15,50]});
+    }
 
-  // --- Fetch live status ---
-  async function fetchPoleStatus(){
+    // --- Add markers ---
+    var markers = [];
+    poles.forEach((pole, idx)=>{
+      var marker = L.marker([pole.lat, pole.lng], {icon: createPoleIcon(pole.status)})
+                    .bindPopup(`<b>${pole.name}</b><br>Status: ${pole.status===0?'Gray (OFF)':pole.status===1?'Green (Working)':'Red (Fault)'}</b>`)
+                    .addTo(map);
+      markers.push(marker);
+    });
+
+    // --- Update from ThingSpeak ---
+    async function updatePoleStatus(){
       try{
-          const res = await fetch(`https://api.thingspeak.com/channels/ 3311507/feeds.json?api_key=${apiKey}&results=1`);
-          const data = await res.json();
-          const feed = data.feeds[0];
+        // Replace this URL with your ThingSpeak channel feed JSON
+        var url = "https://api.thingspeak.com/channels/ 3311507/feeds.json?results=1";
+        let response = await fetch(url);
+        let data = await response.json();
 
-          poles.forEach((pole, index)=>{
-              let val = feed[pole.field];
-              let color = 'gray';
+        // ThingSpeak fields 1,2,3 correspond to pole statuses
+        let feeds = data.feeds[0];
+        let statusArr = [parseInt(feeds.field1), parseInt(feeds.field2), parseInt(feeds.field3)];
 
-              if(val !== null && val !== undefined && val !== ""){
-                  val = parseInt(val);
-                  if(val === 1) color = 'green'; // LED working correctly
-                  else if(val === 2) color = 'red';   // LED fault / darkness not detected
-                  else color = 'gray';
-              }
+        statusArr.forEach((s, idx)=>{
+          poles[idx].status = s;
+          markers[idx].setIcon(createPoleIcon(getPoleColor(s)));
+          markers[idx].setPopupContent(`<b>${poles[idx].name}</b><br>Status: ${s===0?'Gray (OFF)':s===1?'Green (Working)':'Red (Fault)'}</b>`);
+        });
+      } catch(err){
+        console.error("Error fetching ThingSpeak data", err);
+      }
+    }
 
-              pole.status = color;
-              poleMarkers[index].setIcon(createPoleIcon(color));
-              poleMarkers[index].setPopupContent(`<b>${pole.name}</b><br>Status: ${color}<br>Click for history`);
-          });
-      }catch(err){ console.error("ThingSpeak fetch error:", err); }
-  }
+    // --- Auto refresh every 20 seconds (matches ESP32 loop) ---
+    updatePoleStatus();
+    setInterval(updatePoleStatus, 20000);
 
-  fetchPoleStatus(); 
-  setInterval(fetchPoleStatus, 10000); // every 10 sec
-
-  // --- Fetch historical data for popup chart ---
-  async function fetchHistoricalData(field, marker){
-      try{
-          const fieldNum = field.slice(-1);
-          const res = await fetch(`https://api.thingspeak.com/channels/ 3311507/fields/${fieldNum}.json?api_key=${apiKey}&results=20`);
-          const data = await res.json();
-          const feeds = data.feeds;
-
-          const labels = feeds.map(f=>f.created_at.slice(11,19));
-          const values = feeds.map(f=>parseInt(f[`field${fieldNum}`]||0));
-
-          const popupContent = `<b>${marker.getPopup().getContent().split('<br>')[0]}</b><br>
-                                <canvas id="chart${field}" width="250" height="150"></canvas>`;
-          marker.setPopupContent(popupContent);
-
-          setTimeout(()=>{
-              const ctx = document.getElementById(`chart${field}`).getContext('2d');
-              new Chart(ctx,{
-                  type:'line',
-                  data:{
-                      labels:labels,
-                      datasets:[{
-                          label:'Status (0=Gray,1=Green,2=Red)',
-                          data:values,
-                          borderColor:'blue',
-                          backgroundColor:'rgba(0,0,255,0.1)',
-                          tension:0.2,
-                          fill:true
-                      }]
-                  },
-                  options:{
-                      responsive:false,
-                      plugins:{legend:{display:false}},
-                      scales:{y:{min:0,max:2,ticks:{stepSize:1}}}
-                  }
-              });
-          },100);
-
-      }catch(err){ console.error("Historical fetch error:",err); }
-  }
-
-</script>
+  </script>
 </body>
 </html>
