@@ -7,6 +7,12 @@
 
   <style>
     #map { height: 100vh; }
+
+    .pole-label {
+      font-size: 12px;
+      font-weight: bold;
+      color: black;
+    }
   </style>
 </head>
 
@@ -17,60 +23,52 @@
 <script>
 
 // MAP INIT
-var map = L.map('map').setView([19.467960,72.888108 ], 15);
+var map = L.map('map').setView([19.467960,72.888108], 15);
 
 // TILE
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// POLE LOCATIONS
-var poles = [
-  {lat:19.467960, lng:72.888108"},
-  {lat:19.467040, lng:72.872570"},
-  {lat:19.469308, lng:72.862342"}
-];
+// -------- ONLY ONE POLE --------
+var pole = {lat:19.467960, lng:72.888108, name:"Pole 1"};
 
-var markers = [];
+// CREATE CIRCLE MARKER
+var marker = L.circleMarker([pole.lat, pole.lng], {
+  radius: 10,
+  color: "gray"
+}).addTo(map);
 
-// CREATE MARKERS
-for(let i=0;i<poles.length;i++){
-  let marker = L.circleMarker([poles[i].lat, poles[i].lng], {
-    radius: 10,
-    color: "gray"
-  }).addTo(map);
+// NAME BELOW
+marker.bindTooltip(pole.name, {
+  permanent: true,
+  direction: "bottom",
+  offset: [0, 10],
+  className: "pole-label"
+}).openTooltip();
 
-  markers.push(marker);
-}
-
-// FETCH THINGSPEAK
+// -------- FETCH THINGSPEAK --------
 function updateData(){
 
   fetch("https://api.thingspeak.com/channels/3311507/feeds/last.json")
   .then(res => res.json())
   .then(data => {
 
-    let status = [
-      parseInt(data.field1),
-      parseInt(data.field2),
-      parseInt(data.field3)
-    ];
+    let status = Number(data.field1); // ONLY FIELD1
 
-    for(let i=0;i<3;i++){
+    if(status === -1){
+      marker.setStyle({color:"gray"});   // DAY
 
-      if(status[i] == -1){
-        markers[i].setStyle({color:"gray"}); // OFF
+    } else if(status === 1){
+      marker.setStyle({color:"green"});  // WORKING
 
-      } else if(status[i] == 1){
-        markers[i].setStyle({color:"green"}); // WORKING
-
-      } else if(status[i] == 0){
-        markers[i].setStyle({color:"red"}); // FAULT
-      }
+    } else if(status === 0){
+      marker.setStyle({color:"red"});    // FAULT
     }
-  });
+  })
+  .catch(err => console.log(err));
 }
 
-// UPDATE EVERY 10 SEC
-setInterval(updateData, 10000);
+// AUTO UPDATE
+setInterval(updateData, 5000);
 
 </script>
 
