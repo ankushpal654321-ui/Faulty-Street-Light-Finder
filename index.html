@@ -1,92 +1,92 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Street Light Dashboard (3 Poles)</title>
-
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-
-  <!-- Firebase -->
-  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase.js"></script>
-
+  <title>Street Light Dashboard</title>
   <style>
-    #map { height: 100vh; width: 100%; }
+    body {
+      text-align: center;
+      font-family: Arial;
+      background: #111;
+      color: white;
+    }
+
+    .container {
+      display: flex;
+      justify-content: center;
+      gap: 50px;
+      margin-top: 100px;
+    }
+
+    .pole {
+      text-align: center;
+    }
+
+    .dot {
+      height: 80px;
+      width: 80px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-bottom: 10px;
+    }
+
+    .green { background: green; }
+    .red { background: red; }
+    .gray { background: gray; }
   </style>
 </head>
 
 <body>
-  <div id="map"></div>
 
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<h1>Street Light Monitoring System</h1>
 
-  <script>
-    // 🔥 Firebase Config
-    var firebaseConfig = {
-      apiKey: "AIzaSyDCHgKJeB--KlUKseqeAZctPb_pnkImPqg",
-      databaseURL: "https://faulty-street-light-finder-default-rtdb.firebaseio.com/"
-    };
+<div class="container">
 
-    firebase.initializeApp(firebaseConfig);
-    var db = firebase.database();
+  <div class="pole">
+    <div id="p1" class="dot gray"></div>
+    <p>Pole 1</p>
+  </div>
 
-    // 🌍 Map initialize
-    var map = L.map('map').setView([19.07, 72.87], 13);
+  <div class="pole">
+    <div id="p2" class="dot gray"></div>
+    <p>Pole 2</p>
+  </div>
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap'
-    }).addTo(map);
+  <div class="pole">
+    <div id="p3" class="dot gray"></div>
+    <p>Pole 3</p>
+  </div>
 
-    // Store markers for 3 poles
-    var markers = {
-      pole1: null,
-      pole2: null,
-      pole3: null
-    };
+</div>
 
-    // 🎨 Status color
-    function getColor(status) {
-      if(status === "WORKING") return "green";
-      if(status === "FAULT") return "red";
-      return "gray";
-    }
+<script>
 
-    // 🔄 Live update
-    db.ref().on("value", function(snapshot) {
-      var data = snapshot.val();
+const channelID = "YOUR_CHANNEL_ID";
 
-      updatePole("pole1", data);
-      updatePole("pole2", data);
-      updatePole("pole3", data);
-    });
+function updateData(){
+  fetch(`https://api.thingspeak.com/channels/${channelID}/feeds/last.json`)
+  .then(res => res.json())
+  .then(data => {
 
-    // 🔧 Function for each pole
-    function updatePole(poleName, data) {
-      if(!data[poleName]) return;
+    setColor("p1", data.field1);
+    setColor("p2", data.field2);
+    setColor("p3", data.field3);
 
-      let pole = data[poleName];
-      let lat = pole.lat;
-      let lon = pole.lon;
-      let status = pole.status;
-      let color = getColor(status);
+  });
+}
 
-      if(markers[poleName]) {
-        markers[poleName].setLatLng([lat, lon]);
-        markers[poleName].setStyle({
-          color: color,
-          fillColor: color
-        });
-      } 
-      else {
-        markers[poleName] = L.circleMarker([lat, lon], {
-          radius: 10,
-          color: color,
-          fillColor: color,
-          fillOpacity: 1
-        }).addTo(map)
-          .bindPopup(poleName.toUpperCase() + ": " + status);
-      }
-    }
-  </script>
+function setColor(id, status){
+  let el = document.getElementById(id);
+  el.className = "dot";
+
+  if(status === "GREEN") el.classList.add("green");
+  else if(status === "RED") el.classList.add("red");
+  else el.classList.add("gray");
+}
+
+// Auto refresh every 5 sec
+setInterval(updateData, 5000);
+
+</script>
+
 </body>
 </html>
