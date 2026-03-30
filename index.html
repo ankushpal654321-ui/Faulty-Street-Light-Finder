@@ -23,27 +23,38 @@
 <script>
 
 // MAP INIT
-var map = L.map('map').setView([19.467960,72.888108], 15);
+var map = L.map('map').setView([19.467960,72.888108], 14);
 
 // TILE
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// -------- ONLY ONE POLE --------
-var pole = {lat:19.467960, lng:72.888108, name:"Pole 1"};
+// -------- 3 POLES DATA --------
+var poles = [
+  {lat:19.467960, lng:72.888108, name:"Pole 1"},
+  {lat:19.467040, lng:72.872570, name:"Pole 2"},
+  {lat:19.469308, lng:72.862342, name:"Pole 3"}
+];
 
-// CREATE CIRCLE MARKER
-var marker = L.circleMarker([pole.lat, pole.lng], {
-  radius: 10,
-  color: "gray"
-}).addTo(map);
+// STORE MARKERS
+var markers = [];
 
-// NAME BELOW
-marker.bindTooltip(pole.name, {
-  permanent: true,
-  direction: "bottom",
-  offset: [0, 10],
-  className: "pole-label"
-}).openTooltip();
+// CREATE MARKERS
+poles.forEach((pole, index) => {
+
+  let marker = L.circleMarker([pole.lat, pole.lng], {
+    radius: 10,
+    color: "gray"
+  }).addTo(map);
+
+  marker.bindTooltip(pole.name, {
+    permanent: true,
+    direction: "bottom",
+    offset: [0, 10],
+    className: "pole-label"
+  }).openTooltip();
+
+  markers.push(marker);
+});
 
 // -------- FETCH THINGSPEAK --------
 function updateData(){
@@ -52,23 +63,30 @@ function updateData(){
   .then(res => res.json())
   .then(data => {
 
-    let status = Number(data.field1); // ONLY FIELD1
+    let status = [
+      Number(data.field1),
+      Number(data.field2),
+      Number(data.field3)
+    ];
 
-    if(status === -1){
-      marker.setStyle({color:"gray"});   // DAY
+    for(let i=0;i<3;i++){
 
-    } else if(status === 1){
-      marker.setStyle({color:"green"});  // WORKING
+      if(status[i] === -1){
+        markers[i].setStyle({color:"gray"});   // DAY
 
-    } else if(status === 0){
-      marker.setStyle({color:"red"});    // FAULT
+      } else if(status[i] === 1){
+        markers[i].setStyle({color:"green"});  // WORKING
+
+      } else if(status[i] === 0){
+        markers[i].setStyle({color:"red"});    // FAULT
+      }
     }
   })
   .catch(err => console.log(err));
 }
 
 // AUTO UPDATE
-setInterval(updateData, 5000);
+setInterval(updateData, 15000);
 
 </script>
 
