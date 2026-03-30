@@ -22,24 +22,21 @@
 
 <script>
 
-// MAP INIT
+// MAP
 var map = L.map('map').setView([19.467960,72.888108], 14);
 
-// TILE
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// -------- 3 POLES DATA --------
+// POLES
 var poles = [
   {lat:19.467960, lng:72.888108, name:"Pole 1"},
   {lat:19.467040, lng:72.872570, name:"Pole 2"},
   {lat:19.469308, lng:72.862342, name:"Pole 3"}
 ];
 
-// STORE MARKERS
 var markers = [];
 
-// CREATE MARKERS
-poles.forEach((pole, index) => {
+poles.forEach((pole) => {
 
   let marker = L.circleMarker([pole.lat, pole.lng], {
     radius: 10,
@@ -48,45 +45,47 @@ poles.forEach((pole, index) => {
 
   marker.bindTooltip(pole.name, {
     permanent: true,
-    direction: "bottom",
-    offset: [0, 10],
-    className: "pole-label"
+    direction: "bottom"
   }).openTooltip();
 
   markers.push(marker);
 });
 
-// -------- FETCH THINGSPEAK --------
+// AUTO ZOOM
+var group = new L.featureGroup(markers);
+map.fitBounds(group.getBounds());
+
+// FIREBASE FETCH
 function updateData(){
 
-  fetch("https://api.thingspeak.com/channels/3311507/feeds/last.json")
+  fetch("https://faulty-street-light-finder-default-rtdb.firebaseio.com/poles.json")
   .then(res => res.json())
   .then(data => {
 
     let status = [
-      Number(data.field1),
-      Number(data.field2),
-      Number(data.field3)
+      data.pole1,
+      data.pole2,
+      data.pole3
     ];
 
     for(let i=0;i<3;i++){
 
       if(status[i] === -1){
-        markers[i].setStyle({color:"gray"});   // DAY
+        markers[i].setStyle({color:"gray"});
 
       } else if(status[i] === 1){
-        markers[i].setStyle({color:"green"});  // WORKING
+        markers[i].setStyle({color:"green"});
 
       } else if(status[i] === 0){
-        markers[i].setStyle({color:"red"});    // FAULT
+        markers[i].setStyle({color:"red"});
       }
     }
   })
   .catch(err => console.log(err));
 }
 
-// AUTO UPDATE
-setInterval(updateData, 15000);
+// FAST UPDATE ⚡
+setInterval(updateData, 2000);
 
 </script>
 
