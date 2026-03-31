@@ -5,13 +5,24 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
+  <!-- Chart.js for graph -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <style>
     #map { height: 100vh; }
 
-    .pole-label {
-      font-size: 12px;
-      font-weight: bold;
-      color: black;
+    .popup-box {
+      font-size: 13px;
+    }
+
+    button {
+      margin-top: 5px;
+      padding: 4px 8px;
+      border: none;
+      background: #007bff;
+      color: white;
+      cursor: pointer;
+      border-radius: 5px;
     }
   </style>
 </head>
@@ -35,18 +46,91 @@ var poles = [
 ];
 
 var markers = [];
+var historyData = [[], [], []];  // store fault history
 
-poles.forEach((pole) => {
+// CREATE MARKERS
+poles.forEach((pole, i) => {
 
   let marker = L.circleMarker([pole.lat, pole.lng], {
-    radius: 10,
-    color: "gray"
+    radius: 12,
+    color: "gray",
+    weight: 3
   }).addTo(map);
 
   marker.bindTooltip(pole.name, {
     permanent: true,
     direction: "bottom"
   }).openTooltip();
+
+  // CLICK EVENT
+  marker.on("click", function(){
+
+    fetch("https://faulty-street-light-finder-default-rtdb.firebaseio.com/poles.json")
+    .then(res => res.json())
+    .then(data => {
+
+      let status = data["pole"+(i+1)];
+
+      let statusText = "";
+      if(status === 1) statusText = "🟢 Working";
+      else if(status === 0) statusText = "🔴 Fault";
+      else statusText = "⚪ Day";
+
+      // FAULT COUNT
+      let faultCount = historyData[i].length;
+
+      // LAST FAULT
+      let lastFault = faultCount > 0 ? historyData[i][faultCount-1] : "No faults";
+
+      // AI PREDICTION (simple logic)
+      let prediction = (faultCount >= 3) ? "⚠️ High Failure Risk" : "✅ Normal";
+
+      // GOOGLE MAP LINK
+      let mapLink = "https://www.google.com/maps?q=" + pole.lat + "," + pole.lng;
+
+      // POPUP CONTENT
+      let content = `
+        <div class="popup-box">
+        <b>${pole.name}</b><br>
+        Status: ${statusText}<br><br>
+
+        Fault Count Today: ${faultCount}<br>
+        Last Fault: ${lastFault}<br>
+        Prediction: ${prediction}<br><br>
+
+        <canvas id="chart${i}" width="200" height="100"></canvas><br>
+
+        <button onclick="window.open('${mapLink}')">📍 Navigate</button>
+        </div>
+      `;
+
+      marker.bindPopup(content).openPopup();
+
+      // DRAW GRAPH AFTER POPUP LOAD
+      setTimeout(() => {
+        let ctx = document.getElementById(`chart${i}`);
+        if(ctx){
+          new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: historyData[i].map((_, idx) => "F"+(idx+1)),
+              datasets: [{
+                label: "Fault Events",
+                data: historyData[i].map((_, idx) => idx+1),
+                borderWidth: 2
+              }]
+            },
+            options: {
+              responsive: false,
+              plugins: { legend: { display: false } }
+            }
+          });
+        }
+      }, 200);
+
+    });
+
+  });
 
   markers.push(marker);
 });
@@ -55,7 +139,7 @@ poles.forEach((pole) => {
 var group = new L.featureGroup(markers);
 map.fitBounds(group.getBounds());
 
-// FIREBASE FETCH
+// UPDATE DATA
 function updateData(){
 
   fetch("https://faulty-street-light-finder-default-rtdb.firebaseio.com/poles.json")
@@ -70,6 +154,18 @@ function updateData(){
 
     for(let i=0;i<3;i++){
 
+      // STORE FAULT HISTORY
+      if(status[i] === 0){
+        let time = new Date().toLocaleTimeString();
+        historyData[i].push(time);
+
+        // limit history size
+        if(historyData[i].length > 10){
+          historyData[i].shift();
+        }
+      }
+
+      // COLOR UPDATE
       if(status[i] === -1){
         markers[i].setStyle({color:"gray"});
 
@@ -80,11 +176,12 @@ function updateData(){
         markers[i].setStyle({color:"red"});
       }
     }
+
   })
   .catch(err => console.log(err));
 }
 
-// FAST UPDATE ⚡
+// FAST UPDATE
 setInterval(updateData, 2000);
 
 </script>
