@@ -5,12 +5,19 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
+  <!-- Chart.js for graph -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <style>
     #map { height: 100vh; }
 
+    .popup-box {
+      font-size: 13px;
+    }
+
     button {
       margin-top: 5px;
-      padding: 5px 10px;
+      padding: 4px 8px;
       border: none;
       background: #007bff;
       color: white;
@@ -26,13 +33,12 @@
 
 <script>
 
-// MAP INIT
+// MAP
 var map = L.map('map').setView([19.420500,72.819646], 14);
 
-// TILE
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-// POLES DATA
+// POLES
 var poles = [
   {lat:19.420500, lng:72.819646, name:"Pole 1"},
   {lat:19.414958, lng:72.824464, name:"Pole 2"},
@@ -40,9 +46,7 @@ var poles = [
 ];
 
 var markers = [];
-
-// STORE HISTORY
-var historyData = [[], [], []];
+var historyData = [[], [], []];  // store fault history
 
 // CREATE MARKERS
 poles.forEach((pole, i) => {
@@ -72,17 +76,21 @@ poles.forEach((pole, i) => {
       else if(status === 0) statusText = "🔴 Fault";
       else statusText = "⚪ Day";
 
-      // FAULT HISTORY
+      // FAULT COUNT
       let faultCount = historyData[i].length;
+
+      // LAST FAULT
       let lastFault = faultCount > 0 ? historyData[i][faultCount-1] : "No faults";
 
-      // SIMPLE AI PREDICTION
-      let prediction = (faultCount >= 3) ? "⚠️ High Risk" : "✅ Normal";
+      // AI PREDICTION (simple logic)
+      let prediction = (faultCount >= 3) ? "⚠️ High Failure Risk" : "✅ Normal";
 
       // GOOGLE MAP LINK
       let mapLink = "https://www.google.com/maps?q=" + pole.lat + "," + pole.lng;
 
+      // POPUP CONTENT
       let content = `
+        <div class="popup-box">
         <b>${pole.name}</b><br>
         Status: ${statusText}<br><br>
 
@@ -90,15 +98,37 @@ poles.forEach((pole, i) => {
         Last Fault: ${lastFault}<br>
         Prediction: ${prediction}<br><br>
 
-        <button onclick="window.open('${mapLink}')">
-        📍 Navigate
-        </button>
+        <canvas id="chart${i}" width="200" height="100"></canvas><br>
+
+        <button onclick="window.open('${mapLink}')">📍 Navigate</button>
+        </div>
       `;
 
       marker.bindPopup(content).openPopup();
 
-    })
-    .catch(err => console.log(err));
+      // DRAW GRAPH AFTER POPUP LOAD
+      setTimeout(() => {
+        let ctx = document.getElementById(`chart${i}`);
+        if(ctx){
+          new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: historyData[i].map((_, idx) => "F"+(idx+1)),
+              datasets: [{
+                label: "Fault Events",
+                data: historyData[i].map((_, idx) => idx+1),
+                borderWidth: 2
+              }]
+            },
+            options: {
+              responsive: false,
+              plugins: { legend: { display: false } }
+            }
+          });
+        }
+      }, 200);
+
+    });
 
   });
 
@@ -109,14 +139,12 @@ poles.forEach((pole, i) => {
 var group = new L.featureGroup(markers);
 map.fitBounds(group.getBounds());
 
-// FETCH DATA + UPDATE
+// UPDATE DATA
 function updateData(){
 
   fetch("https://faulty-street-light-finder-default-rtdb.firebaseio.com/poles.json")
   .then(res => res.json())
   .then(data => {
-
-    if(!data) return; // safety
 
     let status = [
       data.pole1,
@@ -131,7 +159,7 @@ function updateData(){
         let time = new Date().toLocaleTimeString();
         historyData[i].push(time);
 
-        // LIMIT HISTORY
+        // limit history size
         if(historyData[i].length > 10){
           historyData[i].shift();
         }
@@ -153,7 +181,7 @@ function updateData(){
   .catch(err => console.log(err));
 }
 
-// AUTO UPDATE
+// FAST UPDATE
 setInterval(updateData, 2000);
 
 </script>
